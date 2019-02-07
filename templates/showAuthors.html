@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block content %}
+{% include "header.html" %}
+	<div class="row top-bar">
+		<div class="col-md-10"></div>
+		<div class="col-md-2 text-right"></div>
+	</div>
+	<div class="row divider blue">
+		<div class="col-md-12"></div>
+	</div>
+	<div class="row banner main">
+		<div class="col-md-1"></div>
+		<div class="col-md-11 padding-none">
+			<h1>Authors</h1>
+		</div>
+	</div>
+
+
+	<div class = 'flash'> 
+			      {% with messages = get_flashed_messages() %}
+	      {% if messages %} 
+	          
+	        <ul> 
+	        {% for message in messages %}
+	            <li> <strong> {{ message }} </strong> </li>
+	        {% endfor %}
+	        </ul>
+	        {% endif %}
+	    {% endwith %}
+
+	</div>
+
+	{% for author in authors %}
+		<div class="row">
+			<div class="col-md-1"></div>
+				<div class="col-md-10 readings-list">
+					<h3>{{author.name}}</h3>
+				</div>
+			<div class="col-md-1"></div>
+		</div>
+	{% endfor %}
+{% endblock %}
