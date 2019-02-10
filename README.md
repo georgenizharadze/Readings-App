@@ -10,5 +10,4 @@ You can clone the repository. To start the application on your local machine, go
 
 The database has already been populated with a number of initial entries. You can add, edit and delete domains and readings within the limits of your access, after you have logged in. 
 
-If you want to programatically create a completely new database, you can build your code off the 
-`populate_database.py` file.  
+If you want to programatically create a completely new database, you can run `python database_setup.py`. You can run `python populate_database.py` file, if you want to programatically populate the newly created database with initial entries.   
