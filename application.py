@@ -6,20 +6,29 @@ import string
 import json
 import pprint
 
-from flask import Flask, render_template, request, redirect, jsonify, \
-                  url_for, flash, make_response
-from flask import session as login_session
+from flask import (
+    Flask,
+    render_template,
+    request,
+    redirect,
+    jsonify,
+    url_for,
+    flash,
+    make_response,
+    session as login_session
+)
+
 from oauth2client.client import flow_from_clientsecrets
 from oauth2client.client import FlowExchangeError
 import httplib2
 import requests
 from sqlalchemy import create_engine, asc
 from sqlalchemy.orm import sessionmaker
-from database_setup import Base, User, Domain, Author, ReadingItem 
+from database_setup import Base, User, Domain, Author, ReadingItem
 from sqlalchemy.orm.exc import NoResultFound
 
 
-# Create server app object 
+# Create server app object
 app = Flask(__name__)
 
 
@@ -29,10 +38,11 @@ APPLICATION_NAME = "Readings App"
 
 
 # Connect to Database and create database session
-engine = create_engine('sqlite:///readings.db', 
-                        connect_args={'check_same_thread': False})
+engine = create_engine(
+    'sqlite:///readings.db',
+    connect_args={'check_same_thread': False}
+    )
 Base.metadata.bind = engine
-
 DBSession = sessionmaker(bind=engine)
 session = DBSession()
 
@@ -47,7 +57,7 @@ def showLogin():
     return render_template('login.html', STATE=state)
 
 
-# Facebook login functionality 
+# Facebook login functionality
 @app.route('/fbconnect', methods=['POST'])
 def fbconnect():
     if request.args.get('state') != login_session['state']:
@@ -57,29 +67,27 @@ def fbconnect():
     access_token = request.data
     print "access token received %s " % access_token
 
-
     app_id = json.loads(open('fb_client_secrets.json', 'r').read())[
         'web']['app_id']
     app_secret = json.loads(
         open('fb_client_secrets.json', 'r').read())['web']['app_secret']
-    url = 'https://graph.facebook.com/oauth/access_token?grant_type=fb_exchange_token&client_id=%s&client_secret=%s&fb_exchange_token=%s' \
-          % (app_id, app_secret, access_token)
+    url = 'https://graph.facebook.com/oauth/access_token?grant_type=fb_exchange_token&client_id=%s&client_secret=%s&fb_exchange_token=%s' % (app_id, app_secret, access_token)  # noqa
     h = httplib2.Http()
     result = h.request(url, 'GET')[1]
-
 
     # Use token to get user info from API
     userinfo_url = "https://graph.facebook.com/v2.8/me"
     '''
-        Due to the formatting for the result from the server token exchange we have to
-        split the token first on commas and select the first index which gives us the key : value
-        for the server access token then we split it on colons to pull out the actual token value
-        and replace the remaining quotes with nothing so that it can be used directly in the graph
-        api calls
+        Due to the formatting for the result from the server token exchange
+        we have to split the token first on commas and select the first index
+        which gives us the key : value for the server access token then we
+        split it on colons to pull out the actual token value and replace the
+        remaining quotes with nothing so that it can be used directly in the
+        graph api calls.
     '''
     token = result.split(',')[0].split(':')[1].replace('"', '')
 
-    url = 'https://graph.facebook.com/v2.8/me?access_token=%s&fields=name,id,email' % token # noqa
+    url = 'https://graph.facebook.com/v2.8/me?access_token=%s&fields=name,id,email' % token  # noqa
     h = httplib2.Http()
     result = h.request(url, 'GET')[1]
 
@@ -93,7 +101,7 @@ def fbconnect():
     login_session['access_token'] = token
 
     # Get user picture
-    url = 'https://graph.facebook.com/v2.8/me/picture?access_token=%s&redirect=0&height=200&width=200' % token # noqa
+    url = 'https://graph.facebook.com/v2.8/me/picture?access_token=%s&redirect=0&height=200&width=200' % token  # noqa
     h = httplib2.Http()
     result = h.request(url, 'GET')[1]
     data = json.loads(result)
@@ -113,26 +121,31 @@ def fbconnect():
     output += '!</h1>'
     output += '<img src="'
     output += login_session['picture']
-    output += ' " style = "width: 300px; height: 300px;border-radius: 150px;-webkit-border-radius: 150px;-moz-border-radius: 150px;"> ' # noqa
+    output += (' " style = "width: 300px;'
+               'height: 300px;'
+               'border-radius: 150px;'
+               '-webkit-border-radius: 150px;'
+               '-moz-border-radius: 150px;"> ')
 
     flash("Now logged in as %s" % login_session['username'])
     return output
 
 
-# Facebook logout functionality 
+# Facebook logout functionality
 @app.route('/fbdisconnect')
 def fbdisconnect():
     facebook_id = login_session['facebook_id']
     # The access token must me included to successfully logout
     access_token = login_session['access_token']
-    url = 'https://graph.facebook.com/%s/permissions?access_token=%s' % (facebook_id,access_token) # noqa
+    url = 'https://graph.facebook.com/%s/permissions?access_token=%s' \
+        % (facebook_id, access_token)
     h = httplib2.Http()
     result = h.request(url, 'DELETE')[1]
     return "you have been logged out"
 
 
-# Connect to google auth server to exchage code for token and then request 
-# the resource from the resource server 
+# Connect to google auth server to exchage code for token and then request
+# the resource from the resource server
 @app.route('/gconnect', methods=['POST'])
 def gconnect():
     # Validate state token
@@ -186,8 +199,9 @@ def gconnect():
     stored_access_token = login_session.get('access_token')
     stored_gplus_id = login_session.get('gplus_id')
     if stored_access_token is not None and gplus_id == stored_gplus_id:
-        response = make_response(json.dumps('Current user is already connected.'),
-                                 200)
+        response = make_response(
+            json.dumps('Current user is already connected.'), 200
+            )
         response.headers['Content-Type'] = 'application/json'
         return response
 
@@ -217,10 +231,15 @@ def gconnect():
     output += '!</h1>'
     output += '<img src="'
     output += login_session['picture']
-    output += ' " style = "width: 300px; height: 300px;border-radius: 150px;-webkit-border-radius: 150px;-moz-border-radius: 150px;"> ' # noqa
+    output += (' " style = "width: 300px;'
+               'height: 300px;'
+               'border-radius: 150px;'
+               '-webkit-border-radius: 150px;'
+               '-moz-border-radius: 150px;"> ')
     flash("you are now logged in as %s" % login_session['username'])
     print "done!"
     return output
+
 
 # User Helper Functions
 def createUser(login_session):
@@ -241,7 +260,7 @@ def getUserID(email):
     try:
         user = session.query(User).filter_by(email=email).one()
         return user.id
-    except:
+    except NoResultFound:
         return None
 
 
@@ -256,7 +275,7 @@ def gdisconnect():
             json.dumps('Current user not connected.'), 401)
         response.headers['Content-Type'] = 'application/json'
         return response
-    url = 'https://accounts.google.com/o/oauth2/revoke?token={%s}' % access_token # noqa
+    url = 'https://accounts.google.com/o/oauth2/revoke?token={%s}' % access_token  # noqa
     h = httplib2.Http()
     result = h.request(url, 'GET')[0]
 
@@ -293,24 +312,41 @@ def disconnect():
         return redirect(url_for('showDomains'))
 
 
-# Create routes and functions 
+# Create routes and functions
 @app.route('/')
 @app.route('/domains/')
 def showDomains():
-	domains = session.query(Domain).order_by(asc(Domain.name))
-	return render_template('showDomains.html', domains=domains)
+    """Render a page with all the reading domains
+
+    Returns:
+        on GET: a page with all the reading domains and associated
+        links
+    """
+    domains = session.query(Domain).order_by(asc(Domain.name))
+    return render_template('showDomains.html', domains=domains)
 
 
 @app.route('/domains/JSON')
 def domainsJSON():
+    """API endpoint for domains data
+
+    Returns:
+        on GET: a JSON object with the name, description and DB id
+        of each domain
+    """
     domains = session.query(Domain).all()
     return jsonify(domains=[domain.serialize for domain in domains])
 
 
 @app.route('/authors/')
 def showAuthors():
+    """Render a page with all distinct authors
+
+    Returns:
+        on GET: A page with each unique author present in the DB
+    """
     try:
-        authors = session.query(Author).filter(Author.name!='').all()
+        authors = session.query(Author).filter(Author.name != '').all()
     except NoResultFound:
         return 'The authors database is emtpy.'
     return render_template('showAuthors.html', authors=authors)
@@ -318,8 +354,13 @@ def showAuthors():
 
 @app.route('/authors/JSON')
 def authorsJSON():
+    """API endpoint for authors data
+
+    Returns:
+        on GET: a JSON object with the name, description of each author
+    """
     try:
-        authors = session.query(Author).filter(Author.name!='').all()
+        authors = session.query(Author).filter(Author.name != '').all()
     except NoResultFound:
         return 'The authors database is emtpy.'
     return jsonify(authors=[author.serialize for author in authors])
@@ -327,111 +368,205 @@ def authorsJSON():
 
 @app.route('/domains/<int:domain_id>/readings')
 def showReadings(domain_id):
-	domain = session.query(Domain).filter_by(id=domain_id).one()
-	readings = session.query(ReadingItem, Author).filter(ReadingItem.author_id==
-		Author.id).filter(ReadingItem.domain_id==domain.id).all()
-	return render_template('showReadings.html', domain=domain, readings=readings)
+    """Render a page with all the readings pertaining to a domain
+
+    Args:
+        domain ID, which is generated by once the domain link is clicked
+
+    Returns:
+        on GET: a page with all the readings pertaining to a domain
+    """
+    domain = session.query(Domain).filter_by(id=domain_id).one()
+    readings = session.query(
+        ReadingItem, Author).filter(
+        ReadingItem.author_id ==
+        Author.id).filter(ReadingItem.domain_id == domain.id).all()
+    return render_template(
+        'showReadings.html',
+        domain=domain,
+        readings=readings
+        )
 
 
 @app.route('/domains/<int:domain_id>/readings/JSON')
 def readingItemsJSON(domain_id):
+    """API endpoint for readings data
+
+    Args:
+        Domain ID
+
+    Returns:
+        on GET: a JSON object with the title, author and synopsis and DB id
+        of each reading under the domain
+    """
     readings = session.query(ReadingItem).filter_by(domain_id=domain_id).all()
     return jsonify(readings=[reading.serialize for reading in readings])
 
 
 @app.route('/domains/new', methods=['GET', 'POST'])
 def addDomain():
+    """Add new domain to DB and re-render the page with all domains
+
+    Returns:
+        checks if the user is logged in. If not, redirects to the
+        login page.
+        on POST: adds the new domain to DB and redirects to the page which
+        shows all the domains
+        on GET: renders page to add a domain
+    """
     if 'username' not in login_session:
         return redirect('/login')
     if request.method == 'POST':
-        domain = Domain(name=request.form['name'], 
+        domain = Domain(name=request.form['name'],
                         description=request.form['description'],
                         user_id=login_session['user_id'])
         session.add(domain)
         session.commit()
         return redirect(url_for('showDomains'))
     else:
-	   return render_template('addDomain.html')
+        return render_template('addDomain.html')
 
 
 @app.route('/domains/<int:domain_id>/edit', methods=['GET', 'POST'])
 def editDomain(domain_id):
+    """Edit existing domain
+
+    Args:
+        domain ID
+
+    Returns:
+        checks if the user is logged in; if not, redirects to login page
+        then checks if the user happens to be the one who created the
+        domain; if not, shows a denial message
+        on POST: updates the database with the relevant edits and redirects
+        to all domains page
+        on GET: renders the edit domain page
+    """
     if 'username' not in login_session:
         return redirect('/login')
     domain = session.query(Domain).filter_by(id=domain_id).one()
     if domain.user_id != login_session['user_id']:
-        return "<script>function myFunction() {alert('You are not authorized to edit this domain. Please create your own domain in order to edit.');}</script><body onload='myFunction()''>" # noqa
+        return ("<script>function myFunction()"
+                " {alert('You are not authorized to edit this domain."
+                " Please create your own domain in order to edit.');}"
+                "</script><body onload='myFunction()''>")
     if request.method == 'POST':
         if request.form['name'] and request.form['name'] != domain.name:
             domain.name = request.form['name']
             session.commit()
             flash('Domain name successfully edited.')
         if request.form['description'] and request.form['description'] \
-            != domain.description:
+                != domain.description:
             domain.description = request.form['description']
             session.commit()
-            flash('Domain description successfully edited.')        
+            flash('Domain description successfully edited.')
         return redirect(url_for('showDomains'))
     else:
-       return render_template('editDomain.html', domain=domain)
+        return render_template('editDomain.html', domain=domain)
 
 
 @app.route('/domains/<int:domain_id>/delete', methods=['GET', 'POST'])
 def deleteDomain(domain_id):
+    """Delete domain
+
+    Args:
+        domain ID
+
+    Returns:
+        checks if the user is logged in; if not, redirects to login page
+        then checks if the user happens to be the one who created the
+        domain; if not, shows a denial message
+        on POST: deletes the domain from the database and redirects
+        to all domains page
+        on GET: renders the delete domain page
+    """
     if 'username' not in login_session:
         return redirect('/login')
     domain = session.query(Domain).filter_by(id=domain_id).one()
     if domain.user_id != login_session['user_id']:
-        return "<script>function myFunction() {alert('You are not authorized to delete this domain as you did not create it.');}</script><body onload='myFunction()''>" # noqa
+        return ("<script>function myFunction()"
+                " {alert('You are not authorized to delete this domain"
+                " as you did not create it.');}"
+                "</script><body onload='myFunction()''>")
     if request.method == 'POST':
         if request.form['action'] == 'delete':
             try:
                 session.query(ReadingItem).filter_by(domain_id=domain_id).one()
-                return "<script>function myFunction() {alert('You cannot to delete this domain as it has readings listed under it.');}</script><body onload='myFunction()''>" # noqa
+                return ("<script>function myFunction()"
+                        " {alert('You cannot to delete this domain"
+                        " as it has readings listed under it.');}"
+                        "</script><body onload='myFunction()''>")
             except NoResultFound:
                 session.delete(domain)
                 session.commit()
         return redirect(url_for('showDomains'))
-    else: 
+    else:
         return render_template('deleteDomain.html', domain=domain)
 
 
 @app.route('/domains/<int:domain_id>/readings/new', methods=['GET', 'POST'])
 def addReading(domain_id):
+    """Add new reading to DB and re-render all the readings under the domain
+
+    Args:
+        domain ID
+
+    Returns:
+        checks if the user is logged in. If not, redirects to the
+        login page.
+        on POST: add the reading the the DB and redirects to the page
+        which shows all the readings under the domain
+        on GET: renders the page to add a reading
+    """
     if 'username' not in login_session:
         return redirect('/login')
     if request.method == 'POST':
-        if not (request.form['title'] and request.form['author']):
-            return "<script>function myFunction() {alert('You have to provide both title and author name');}</script><body onload='myFunction()''>" # noqa
-        try: 
+        try:
             author = session.query(Author).\
                 filter_by(name=request.form['author']).one()
         except NoResultFound:
-            author = Author(name=request.form['author'], 
+            author = Author(name=request.form['author'],
                             user_id=login_session['user_id'])
             session.add(author)
             session.commit()
-        reading = ReadingItem(name=request.form['title'], 
+        reading = ReadingItem(name=request.form['title'],
                               synopsis=request.form['synopsis'],
-                              author_id=author.id, 
-                              domain_id=domain_id, 
+                              author_id=author.id,
+                              domain_id=domain_id,
                               user_id=login_session['user_id'])
         session.add(reading)
         session.commit()
         return redirect(url_for('showReadings', domain_id=domain_id))
     else:
-	   return render_template('addReading.html')
+        return render_template('addReading.html')
 
 
-@app.route('/domains/<int:domain_id>/readings/<reading_id>/edit', 
+@app.route('/domains/<int:domain_id>/readings/<reading_id>/edit',
            methods=['GET', 'POST'])
 def editReading(domain_id, reading_id):
+    """Edit existing reading
+
+    Args:
+        domain ID
+        reading ID
+
+    Returns:
+        checks if the user is logged in; if not, redirects to login page
+        then checks if the user happens to be the one who created the
+        reading; if not, shows a denial message
+        on POST: updates the database with the relevant edits and redirects
+        to all readings page under the domains
+        on GET: renders the edit reading page
+    """
     if 'username' not in login_session:
         return redirect('/login')
     reading = session.query(ReadingItem).filter_by(id=reading_id).one()
     author = session.query(Author).filter_by(id=reading.author_id).one()
     if reading.user_id != login_session['user_id']:
-        return "<script>function myFunction() {alert('You are not authorized to edit this reading. Please create your own reading in order to edit.');}</script><body onload='myFunction()''>" # noqa
+        return ("<script>function myFunction()"
+                " {alert('You are not authorized to edit this reading."
+                " Please create your own reading in order to edit.');}"
+                "</script><body onload='myFunction()''>")
     if request.method == 'POST':
         if request.form['name'] and request.form['name'] != reading.name:
             reading.name = request.form['name']
@@ -444,32 +579,52 @@ def editReading(domain_id, reading_id):
         flash('Reading successfully edited')
         return redirect(url_for('showReadings', domain_id=domain_id))
     else:
-	   return render_template('editReading.html', 
-                               reading=reading, 
-                               author=author)
+        return render_template(
+            'editReading.html',
+            reading=reading,
+            author=author
+            )
 
 
-@app.route('/domains/<int:domain_id>/readings/<reading_id>/delete', 
-            methods=['GET', 'POST'])
+@app.route('/domains/<int:domain_id>/readings/<reading_id>/delete',
+           methods=['GET', 'POST'])
 def deleteReading(domain_id, reading_id):
+    """Delete reading
+
+    Args:
+        domain ID
+        reading ID
+
+    Returns:
+        checks if the user is logged in; if not, redirects to login page
+        then checks if the user happens to be the one who created the
+        reading; if not, shows a denial message
+        on POST: deletes the reading from the database and redirects
+        to all readings page under the domains
+        on GET: renders the delete reading page
+    """
     if 'username' not in login_session:
         return redirect('/login')
     reading = session.query(ReadingItem).filter_by(id=reading_id).one()
     domain = session.query(Domain).filter_by(id=domain_id).one()
     if reading.user_id != login_session['user_id']:
-        return "<script>function myFunction() {alert('You are not authorized to edit this reading. Please create your own reading in order to edit.');}</script><body onload='myFunction()''>" # noqa
+        return ("<script>function myFunction()"
+                " {alert('You are not authorized to edit this reading."
+                " Please create your own reading in order to edit.');}"
+                "</script><body onload='myFunction()''>")
     if request.method == 'POST':
         if request.form['action'] == 'delete':
             session.delete(reading)
             session.commit()
-            flash('Successfully deleted {0.name} from {1.name} domain.'\
-                .format(reading, domain))
-            #print request.form
+            flash('Successfully deleted {0.name} from {1.name} domain.'
+                  .format(reading, domain))
         return redirect(url_for('showReadings', domain_id=domain_id))
     else:
-        return render_template('deleteReading.html', 
-                                reading=reading, 
-                                domain=domain)
+        return render_template(
+            'deleteReading.html',
+            reading=reading,
+            domain=domain
+            )
 
 
 if __name__ == '__main__':
